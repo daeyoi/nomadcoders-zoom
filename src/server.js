@@ -43,6 +43,36 @@ const server = http.createServer(app);
 //같은 서버에서 http, ws서버 두개를 돌릴 수 있음.
 const wss = new WebSocket.Server({ server });
 
+//fake database
+//서버 연결 시 connection을 담는 용도
+const sockets = [];
+
+//socket: 연결된 브라우저와의 contact 라인
+//on(event, fucntion)
+wss.on("connection", (socket) => {
+    sockets.push(socket);
+    //기본 닉네임
+    socket["nickname"] = "익명";
+    //브라우저와 연결 반응 (하지 않아도 연결은 되어있음. frontEnd에서 요청했기 때문에)
+    //마치 버튼과도 같음. connection 을 listen해주는 것
+    console.log("Connected to Browser ✅");
+    //연결 종료 listener
+    socket.on("close", () => console.log("Disconnected form Browser ❌"));
+    //메시지 수신 listner
+    socket.on("message", (msg) => { 
+        //메시지 보내기
+        const message = JSON.parse(msg);
+        switch(message.type) {
+            case "new_message":
+                sockets.forEach(aSocket => aSocket.send(`${socket.nickname}: ${message.payload}`));
+                break;
+            case "nickname":
+                socket["nickname"] = message.payload;
+                break;
+        }
+    });
+});
+
 //http서버에 연결
 //http 위에 있는 ws 서버 위에도 연결
 server.listen(3000, handlerListen);
