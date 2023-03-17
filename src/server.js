@@ -55,10 +55,15 @@ ioServer.on("connection", (socket) => {
         console.log(`Socket Event: ${event}`);
     });
     // 방 참가
-    socket.on("enter_room", (roomName, done) => {
-      socket.join(roomName);
-      done();
-      socket.to(roomName).emit("welcome", socket.nickname);
+    socket.on("enter_room", (roomName, nickName, done) => {
+        // 닉네임 셋팅, 검토사항: isEmpty
+        console.log(nickName+"!!");
+        if(nickName) {
+            socket["nickname"] = nickName;
+        }
+        socket.join(roomName);
+        done();
+        socket.to(roomName).emit("welcome", socket.nickname);
     });
     // 방 퇴장
     socket.on("disconnecting", () => {

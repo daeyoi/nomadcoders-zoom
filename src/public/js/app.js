@@ -54,10 +54,13 @@ function showRoom(msg) {
 // submit버튼이 눌렸을 때 함수
 function handleRoomSubmit(event){
     event.preventDefault();
-    const input = form.querySelector("input");
-    socket.emit("enter_room", input.value, showRoom);
-    roomName = input.value;
-    input.value="";
+    const roomInput = form.querySelector("#roomName");
+    //닉네임 전송
+    const nickInput = form.querySelector("#nick");
+
+    socket.emit("enter_room", roomInput.value, nickInput.value, showRoom);
+    roomName = roomInput.value;
+    roomInput.value="";
 }
 
 form.addEventListener("submit", handleRoomSubmit);
