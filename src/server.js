@@ -48,14 +48,30 @@ console.log(" |_| |_|)___|_|_|)___/  |_| )_|)___/ )___/|_| |_| |_(_|_)");
 const handlerListen = () => console.log(`Listening on http://localhost:3000`);
 
 ioServer.on("connection", (socket) => {
-    socket.on("enter_room", (roomName, done) => {
-      console.log(roomName);
-      setTimeout(() => {
-        done("hello from the backend");
-      }, 15000);
-    });
-});
+    socket["nickname"] = "Anon";
 
+    // 이벤트 명 호출
+    socket.onAny((event) => {
+        console.log(`Socket Event: ${event}`);
+    });
+    // 방 참가
+    socket.on("enter_room", (roomName, done) => {
+      socket.join(roomName);
+      done();
+      socket.to(roomName).emit("welcome", socket.nickname);
+    });
+    // 방 퇴장
+    socket.on("disconnecting", () => {
+        socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname));
+    });
+    // 메시지 수신
+    socket.on("new_message", (msg, room, done) => {
+        socket.to(room).emit("new_message", `${socket.nickname} : ${msg}`);
+        done();
+    });
+    // 닉네임 수신
+    socket.on("nickname", (nickname) => socket["nickname"] = nickname);
+});
 /* //fake database
 //서버 연결 시 connection을 담는 용도
 const sockets = [];
