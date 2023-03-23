@@ -3,10 +3,13 @@
 //http: 기본적으로 node에 설치 되어 있음
 import http from "http";
 // import WebSocket from "ws";
-import SocketIO from "socket.io";
+import {Server} from "socket.io";
+import {instrument} from "@socket.io/admin-ui";
 import express from "express";
 // == const express = require('express') 인건가?
+
 const app = express();
+
 
 //app에 pug 설정
 //views 설정
@@ -36,7 +39,16 @@ const httpServer = http.createServer(app);
 // const wss = new WebSocket.Server({ httpServer });
 
 //socket.io 서버
-const ioServer = SocketIO(httpServer);
+//admin page 포함
+const ioServer = new Server(httpServer, {
+    cors: {
+        origin: ["https://admin.socket.io"],
+        redentials: true,
+    },
+});
+instrument(ioServer, {
+    auth: false
+});
 
 console.log("  _   _      _ _         _   _                       _ _ ");
 console.log(" | | | | ___| | | ___   | ) | | ___   ___  _ __ ___ | | |");
@@ -47,11 +59,36 @@ console.log(" |_| |_|)___|_|_|)___/  |_| )_|)___/ )___/|_| |_| |_(_|_)");
 
 const handlerListen = () => console.log(`Listening on http://localhost:3000`);
 
+//public rooms를 주는 function
+function publicRooms() {
+    //sexy한 방법
+    const { sockets: { adapter: { sids, rooms } } } = ioServer;
+    // //private rooms
+    // const sids = ioServer.sockets.adapter.sids;
+    // //rooms
+    // const rooms = ioServer.sockets.adapter.rooms;
+    
+    const publicRooms = [];
+    rooms.forEach((_, key) => {
+        if (sids.get(key) === undefined) {
+            publicRooms.push(key);
+        }
+    });
+    return publicRooms;
+}
+
+// room 참가자를 세어주는 function
+function countRoom(roomName) {
+    // ?의미
+    return ioServer.sockets.adapter.rooms.get(roomName)?.size;
+}
+
 ioServer.on("connection", (socket) => {
     socket["nickname"] = "Anon";
 
     // 이벤트 명 호출
     socket.onAny((event) => {
+        console.log(ioServer.sockets.adapter);
         console.log(`Socket Event: ${event}`);
     });
     // 방 참가
@@ -63,12 +100,22 @@ ioServer.on("connection", (socket) => {
         }
         socket.join(roomName);
         done();
-        socket.to(roomName).emit("welcome", socket.nickname);
+        // 메시지를 하나의 소켓에만 전송 (room 내부에 참가 소식)
+        socket.to(roomName).emit("welcome", socket.nickname, countRoom(roomName));
+        // 메시지를 모든 소켓에게 전송 (존재하는 room들)
+        ioServer.sockets.emit("room_change", publicRooms());
     });
-    // 방 퇴장
+    // 방 퇴장 중 (퇴장완료 직전)
     socket.on("disconnecting", () => {
-        socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname));
+        // 참가 중이었던 room 내부에 소식
+        socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname, countRoom(room) - 1));
     });
+    // 방 퇴장 완료
+    socket.on("disconnect", () => {
+        // 메시지를 모든 소켓에게 전송 (존재하는 room들)
+        ioServer.sockets.emit("room_change", publicRooms());
+    });
+    
     // 메시지 수신
     socket.on("new_message", (msg, room, done) => {
         socket.to(room).emit("new_message", `${socket.nickname} : ${msg}`);
